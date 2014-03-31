@@ -1,15 +1,95 @@
+/*
+Reference: http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/osfmk/vm/vm_user.c
+
+OSX: clang -framework Foundation -o HippocampHairSalon main.m
+iOS: clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS7.0.sdk -arch armv7 -arch armv7s -arch arm64 -framework Foundation -o HippocampHairSalon main.m
+
+kern_return_t
+mach_vm_protect(
+	vm_map_t		map,
+	mach_vm_offset_t	start,
+	mach_vm_size_t		size,
+	boolean_t		set_maximum,
+	vm_prot_t		new_protection)
+	
+kern_return_t
+vm_protect(
+	vm_map_t		map,
+	vm_offset_t		start,
+	vm_size_t		size,
+	boolean_t		set_maximum,
+	vm_prot_t		new_protection)
+
+kern_return_t
+mach_vm_read(
+	vm_map_t		map,
+	mach_vm_address_t	addr,
+	mach_vm_size_t		size,
+	pointer_t		*data,
+	mach_msg_type_number_t	*data_size)
+
+kern_return_t
+vm_read(
+	vm_map_t		map,
+	vm_address_t		addr,
+	vm_size_t		size,
+	pointer_t		*data,
+	mach_msg_type_number_t	*data_size)
+
+kern_return_t
+mach_vm_write(
+	vm_map_t			map,
+	mach_vm_address_t		address,
+	pointer_t			data,
+	__unused mach_msg_type_number_t	size)
+
+kern_return_t
+vm_write(
+	vm_map_t			map,
+	vm_address_t			address,
+	pointer_t			data,
+	__unused mach_msg_type_number_t	size)
+
+kern_return_t
+mach_vm_region(
+	vm_map_t		 map,
+	mach_vm_offset_t	*address,
+	mach_vm_size_t		*size,		
+	vm_region_flavor_t	 flavor,
+	vm_region_info_t	 info,		
+	mach_msg_type_number_t	*count,	
+	mach_port_t		*object_name)
+
+kern_return_t
+vm_region_64(
+	vm_map_t		 map,
+	vm_offset_t	        *address,
+	vm_size_t		*size,	
+	vm_region_flavor_t	 flavor,	
+	vm_region_info_t	 info,		
+	mach_msg_type_number_t	*count,		
+	mach_port_t		*object_name)
+
+kern_return_t
+vm_region(
+	vm_map_t			map,
+	vm_address_t	      		*address,
+	vm_size_t			*size,	
+	vm_region_flavor_t	 	flavor,	
+	vm_region_info_t	 	info,	
+	mach_msg_type_number_t		*count,	
+	mach_port_t			*object_name)
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <mach/mach.h>
-#include <mach/mach_vm.h>
 #include <sys/sysctl.h>
 #import <Foundation/Foundation.h>
 
-#if TARGET_OS_IPHONE
-// iOS code
-#else
-// OSX code
+#if TARGET_OS_OSX
+#include <mach/mach_vm.h>
 #endif
 
 static NSArray *AllProcesses(void)
@@ -94,20 +174,33 @@ Search:
 	scanf("%d", &targetValue);
 
 	// Output all searched results
-	mach_vm_address_t address = 0;
+#if TARGET_OS_OSX
+	mach_vm_offset_t address = 0;
 	mach_vm_size_t size;
+#elif
+	vm_offset_t address = 0;
+	vm_size_t size;
+#endif
 	mach_port_t object_name;
-	vm_region_basic_info_data_t info;
+	vm_region_info_t info;
 	mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
 	int occurranceCount = 0;
 	[substringArray removeAllObjects];
 	[protectionArray removeAllObjects];
-	while (mach_vm_region(task, &address, &size, VM_REGION_BASIC_INFO, (vm_region_info_t)&info, &count, &object_name) == KERN_SUCCESS)
+#if TARGET_OS_OSX
+	while (mach_vm_region(task, &address, &size, VM_REGION_BASIC_INFO, &info, &count, &object_name) == KERN_SUCCESS)
+#elif
+	while (vm_region_64(task, &address, &size, VM_REGION_BASIC_INFO, &info, &count, &object_name) == KERN_SUCCESS)
+#endif
 	{
-		vm_offset_t buffer;
+		pointer_t buffer;
 		mach_msg_type_number_t bufferSize = size;
 		vm_prot_t protection = info.protection;
-		if (mach_vm_read(task, address, size, &buffer, &bufferSize) == KERN_SUCCESS)
+#if TARGET_OS_OSX
+		if (mach_vm_read(task, (mach_vm_address_t)address, size, &buffer, &bufferSize) == KERN_SUCCESS)
+#elif 
+		if (vm_read(task, (vm_address_t)address, size, &buffer, &bufferSize) == KERN_SUCCESS)
+#endif
 		{
 			void *substring = NULL;
 			if ((substring = memmem((const void *)buffer, bufferSize, &targetValue, sizeof(targetValue))) != NULL)
@@ -135,7 +228,11 @@ NextAction:
 				// Prompt
 				while (getchar() != '\n') continue; // clear buffer
 				printf("Enter the address of modification: ");
+#if TARGET_OS_OSX
 				mach_vm_address_t modAddress;
+#elif
+				vm_address_t modAddress;
+#endif
 				scanf("0x%llx", &modAddress);
 
 				while (getchar() != '\n') continue; // clear buffer
@@ -143,7 +240,11 @@ NextAction:
 				int newValue;
 				scanf("%d", &newValue);
 
-				if ((kret = mach_vm_write(task, modAddress, (vm_offset_t)&newValue, sizeof(newValue))) != KERN_SUCCESS) printf("mach_vm_write failed, error %d: %s\n", kret, mach_error_string(kret));
+#if TARGET_OS_OSX
+				if ((kret = mach_vm_write(task, modAddress, (pointer_t)&newValue, sizeof(newValue))) != KERN_SUCCESS) printf("mach_vm_write failed, error %d: %s\n", kret, mach_error_string(kret));
+#elif
+				if ((kret = vm_write(task, modAddress, (pointer_t)&newValue, sizeof(newValue))) != KERN_SUCCESS) printf("vm_write failed, error %d: %s\n", kret, mach_error_string(kret));
+#endif
 				goto NextAction;					
 			}
 		case 2:
@@ -152,9 +253,13 @@ NextAction:
 				{
 					NSNumber *substringNumber = [substringArray objectAtIndex:i];
 					long substring = [substringNumber longValue];
-					vm_offset_t buffer;
+					pointer_t buffer;
 					mach_msg_type_number_t bufferSize = sizeof(int);
-					if (mach_vm_read(task, substring, size, &buffer, &bufferSize) == KERN_SUCCESS)
+#if TARGET_OS_OSX
+					if (mach_vm_read(task, (mach_vm_address_t)substring, size, &buffer, &bufferSize) == KERN_SUCCESS)
+#elif
+					if (vm_read(task, (mach_vm_address_t)substring, size, &buffer, &bufferSize) == KERN_SUCCESS)
+#endif
 					{
 						printf("Search result %2d: %d at 0x%0lx (%s)\n", i + 1, *(int *)buffer, substring, [[protectionArray objectAtIndex:i] UTF8String]);
 					}
