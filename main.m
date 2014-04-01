@@ -7,22 +7,6 @@ iOS: clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhone
 Then: ldid -Sent.xml HippocampHairSalon
 
 kern_return_t
-mach_vm_protect(
-	vm_map_t		map,
-	mach_vm_offset_t	start,
-	mach_vm_size_t		size,
-	boolean_t		set_maximum,
-	vm_prot_t		new_protection)
-	
-kern_return_t
-vm_protect(
-	vm_map_t		map,
-	vm_offset_t		start,
-	vm_size_t		size,
-	boolean_t		set_maximum,
-	vm_prot_t		new_protection)
-
-kern_return_t
 mach_vm_read(
 	vm_map_t		map,
 	mach_vm_address_t	addr,
@@ -94,13 +78,10 @@ vm_region(
 #include <mach/mach_vm.h>
 #else
 /*
-#define mach_vm_protect vm_protect
 #define mach_vm_read vm_read
 #define mach_vm_write vm_write
 #define mach_vm_region vm_region_64
 */
-#define	mach_vm_offset_t vm_offset_t
-#define	mach_vm_size_t vm_size_t
 
 extern kern_return_t
 mach_vm_read(
@@ -248,7 +229,7 @@ Search:
 
 NextAction:
 	// Prompt
-	printf("1. Modify searched results;\n2. Review searched results;\n3. Search something else.\nPlease choose your next action: ");
+	printf("1. Modify search results;\n2. Review search results;\n3. Search something else.\nPlease choose your next action: ");
 	int nextAction;
 	scanf("%d", &nextAction);
 
@@ -262,6 +243,12 @@ NextAction:
 				printf("Enter the address of modification: ");
 				mach_vm_address_t modAddress;
 				scanf("0x%llx", &modAddress);
+
+				if ([substringArray indexOfObject:[NSNumber numberWithLongLong:modAddress]] == NSNotFound)
+				{
+					printf("This address is not in search results, hence invalid. Please re-enter.\n");
+					goto NextAction;
+				}
 
 				while (getchar() != '\n') continue; // clear buffer
 				printf("Enter the new value: ");
