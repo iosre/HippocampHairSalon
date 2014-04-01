@@ -264,9 +264,10 @@ NextAction:
 				{
 					NSNumber *substringNumber = [substringArray objectAtIndex:i];
 					pointer_t buffer;
+					size = sizeof(long);
 					mach_msg_type_number_t bufferSize = sizeof(long);
 #if CGFLOAT_IS_DOUBLE
-					long substring = [substringNumber longValue];	
+					long substring = [substringNumber longValue];
 					if ((kret = mach_vm_read(task, (mach_vm_address_t)substring, size, &buffer, &bufferSize)) == KERN_SUCCESS)
 					{
 						printf("Search result %2d: %ld at 0x%0llx (%s)\n", i + 1, *(long *)buffer, (mach_vm_address_t)substring, [[protectionArray objectAtIndex:i] UTF8String]);
