@@ -122,8 +122,8 @@ int main(int argc, char *argv[])
 Search:
 	// Prompt
 	printf("Enter the value to search: ");
-	long oldValue = 0; // change type: int, unsigned long, unsigned int, etc.
-	scanf("%ld", &oldValue);
+	int oldValue = 0; // change type: unsigned int, long, unsigned long, etc. Should be customizable!
+	scanf("%d", &oldValue);
 
 	// Output all searched results
 	mach_vm_offset_t address = 0;
@@ -147,11 +147,11 @@ Search:
 				occurranceCount++;
 #if CGFLOAT_IS_DOUBLE
 				long realAddress = (long)substring - (long)buffer + (long)address;
-				printf("Search result %2d: %ld at 0x%0lx (%s)\n", occurranceCount, oldValue, realAddress, (protection & VM_PROT_WRITE) != 0 ? "writable" : "non-writable");
+				printf("Search result %2d: %d at 0x%0lx (%s)\n", occurranceCount, oldValue, realAddress, (protection & VM_PROT_WRITE) != 0 ? "writable" : "non-writable");
 				[substringArray addObject:[NSNumber numberWithLong:realAddress]];
 #else
 				int realAddress = (int)substring - (int)buffer + (int)address;
-				printf("Search result %2d: %ld at 0x%0x (%s)\n", occurranceCount, oldValue, realAddress, (protection & VM_PROT_WRITE) != 0 ? "writable" : "non-writable");
+				printf("Search result %2d: %d at 0x%0x (%s)\n", occurranceCount, oldValue, realAddress, (protection & VM_PROT_WRITE) != 0 ? "writable" : "non-writable");
 				[substringArray addObject:[NSNumber numberWithInt:realAddress]];
 #endif
 				[protectionArray addObject:[NSString stringWithUTF8String:(protection & VM_PROT_WRITE) != 0 ? "writable" : "non-writable"]];
@@ -186,8 +186,8 @@ NextAction:
 
 				while (getchar() != '\n') continue; // clear buffer
 				printf("Enter the new value: ");
-				long newValue;
-				scanf("%ld", &newValue);
+				int newValue; // change type: unsigned int, long, unsigned long, etc. Should be customizable!
+				scanf("%d", &newValue);
 
 				if ((kret = mach_vm_write(task, modAddress, (pointer_t)&newValue, sizeof(newValue))) != KERN_SUCCESS) printf("mach_vm_write failed, error %d: %s\n", kret, mach_error_string(kret));
 				goto NextAction;					
@@ -198,7 +198,7 @@ NextAction:
 				{
 					NSNumber *substringNumber = [substringArray objectAtIndex:i];
 					pointer_t buffer;
-					size = sizeof(long); // because oldValue and newValue is long
+					size = sizeof(int); // because oldValue and newValue is int
 					mach_msg_type_number_t bufferSize = size;
 #if CGFLOAT_IS_DOUBLE
 					long substring = [substringNumber longValue];

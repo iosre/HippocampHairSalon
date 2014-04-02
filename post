@@ -1,0 +1,141 @@
+Hi guys!
+Memory editor is used as game trainer on iOS/OSX by most power users, but very few App Store developers know how to write one. Today I'll be here guiding you through the very basic knowledge of writing a memory editor, we'll review some basic concepts which may be ignored by Objective-C coders, describe how a memory editor works, explain the usage of some memory manipulation functions, and write the code at last. Our target is a working memory editor (game trainer) who successfully cheats "Blood & Glory 2" from OSX App Store and "大富翁4FunLite" from iOS App Store. Feel free to correct me if anything is wrong, and have fun <3
+
+Part I Basic concepts
+1. Process
+We write HelloWorld.c, compile it and get HelloWorld.exe, an executable. On iOS/OSX, executables are all MachO format, containing data and instructions needed for execution. When the executable is run by OS, it becomes a process. So actually executable and process are different status of a same object, i.e. some data and a set of instructions. We can view executable as static, process as dynamic. Executable is stored on hard disk, while process is "stored" in memory. So bare in mind, process contains data, and the data is in memory.
+
+2. Virtual memory, memory page and memory region
+When OS runs an executable, it loads this executable from hard disk to memory. Where in memory is this process located? This is a very complicated procedure that ATM, the only thing you need to know is that every process has its own separate memory space, and this is achieved by memory virtualization. Most of the memory operations we do happen on virtual memory, and for a 32-bit processor like ARMv7, the virtual memory size for each process is 2^32 = 4G bytes large. But most processes don't take 4G memory to run, they consume only a small part of 4G. The actual size of memory a process uses is called the process' virtual memory address space, and the 4G bytes virtual memory space is divided into many many memory pages for distribution, while memory page is "a fixed-length (4096 bytes on iOS/OSX) contiguous block of virtual memory, and it is the smallest unit of data for memory operation". The virtual memory address space of a process consists of numerous regions of memory. Each memory region contains a number of virtual memory pages, and pay attention, memory regions may not be contiguous. So the above concepts can be depicted by the following scrawls:
+Pic1, 2
+
+Part II Modeling
+After a brief introduction to the basic concepts, you may wonder, what does that have to do with our goal? Good question. So now let's try to turn the above theory into a programming model, hence we can write code to realize our thoughts.
+Think with me: What's a memory editor? Sure it edits memory. But how? There're addresses in memory, we can simply locate the address where our target value resides, and use system APIs to read/write it. But where's the target value address? How do we locate it? Keep reading.
+I bet you know that, however deep level code we write, it's human-readable. Humans can't read machine code, but machines can — it's their native language! And all machine code is binary format, it's a mix of 0s and 1s. That's to say, both data and instructions are translated to a combination of 0s and 1s ultimately, and a process' virtual memory address space is filled with 0s and 1s. If the target value is, say, "010101", and the virtual memory address space is like "00000111110101010110011000...", locating our target value in virtual memory address space is as easy as searching for a string pattern inside a paragraph. In our example, there is a matching pattern in memory, starting at the 11th number "0", ending at the 16th number "1".
+In actual cases, it's easier to view the binary as hexdecimal. So a segment of memory would be like this:
+Pic3
+Note that each block like "0xfeedface" takes 4 bytes (because 0xfe = 11111110 = 8 bits = 1 byte), so it's like:
+Address : Byte
+0x02cb2000 : 0xfe
+0x02cb2001 : 0xed
+0x02cb2002 : 0xfa
+0x02cb2003 : 0xce
+0x02cb2004 : 0x00
+...
+0x02cb200c : 0x00
+0x02cb200d : 0x00
+0x02cb200e : 0x00
+0x02cb200f : 0x08
+
+So if our target value is int targetValue = 21592 == 0x5458, we can find it in the memory segment from address 0x02cb2009 to 0x02cb200c, right? However, because instructions and other data are also stored in memory, 0x5458 may be part of an instruction, or part of a long number (say 0x45545f5f00005458), it may not present our int target value. This situation happens in most of our memory searchs, i.e. more than one match can be found. If that's the case, we have to search again for a more specific value (we'll look into this later in the example). Now we know what "searching memory" means :)
+
+With this information, we can try to model our memory editor. It can be divided into 3 steps:
+i) Get the virtual memory address space of the target process, by enumerate all its virtual memory regions;
+ii) Search our target value in the address space, and get the possible address of our target value;
+iii) Modify the value at the suspicious addresses (by some tricks, one of which we'll discuss).
+
+That's it. Simpler and clearer than you originally thought, huh?
+
+Part III Functions
+Before coding, let's get familiar with the main functions we're gonna use frequently. They're all mach_vm functions, which can be found at http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/osfmk/vm/vm_user.c. They're: (words between dollar symbols are $arguments$)
+
+1. kern_return_t
+mach_vm_read(
+	vm_map_t		map,
+	mach_vm_address_t	addr,
+	mach_vm_size_t		size,
+	pointer_t		*data,
+	mach_msg_type_number_t	*data_size)
+
+Description: Read/copy a range from one address space and return it to the caller. $map$ is the port for the task whose memory is to be read; $addr$ is the address at which to start the read; $size$ is the number of bytes to read; $data$ is a buffer to store the read bytes; $data_size$ on input, is a pointer to the maximum size of the buffer; on output, points to the size returned.
+
+2. kern_return_t
+mach_vm_write(
+	vm_map_t			map,
+	mach_vm_address_t		address,
+	pointer_t			data,
+	__unused mach_msg_type_number_t	size); 
+
+Description: Write data to the specified address in the target task's address space. $map$ is the port for the task whose memory is to be written; $address$ is the address at which to start the write; $data$ is a buffer to be written; $size$ is the size of $data$.
+
+3. kern_return_t
+mach_vm_region(
+	vm_map_t		 map,
+	mach_vm_offset_t	*address,
+	mach_vm_size_t		*size,		
+	vm_region_flavor_t	 flavor,
+	vm_region_info_t	 info,		
+	mach_msg_type_number_t	*count,	
+	mach_port_t		*object_name);
+
+Description: Return description of a virtual memory region. $map$ is the port for the task whose address space contains the region; $addr$ on input, is the address at which to start looking for a region; on output, returns the starting address actually used; $size$ is the number of bytes in the located region; $flavor$ is the type of information to be returned, should be VM_REGION_BASIC_INFO; $info$ returns region information, should be of type vm_region_basic_info_data_64_t on both 32-bit and 64-bit OSes; $count$ on input, should be VM_REGION_BASIC_INFO_COUNT_64; on output, the size of the region.
+
+4. void *
+memmem(const void *big, size_t big_len, const void *little, size_t little_len);
+
+Description: Locates the first occurrence of the byte string $little$ in the byte string $big$. If it matches, a pointer to the first character of the first occurrence of $little$ is returned; Else it returns NULL.
+
+Part IV Coding
+There's only one thing worth mentioning before we get coding: the example we give only works on games with no custom memory protection. The coder himself (a.k.a. myself) is a n00b on memory operation, so the code may not be very efficient and elegant. Feel free to make optimization :P BTW, I've tried to comment most of the obscure code, so if you still can't catch it, just ask!
+
+Click me for the code
+
+Part V Testing
+(I got inspiration of the name from a mini movie, which is "海马洗头" in Chinese and tells a story about people's memory. It's one part of 20 mini movies, all by famous Taiwanese directors. I strongly suggest you watch them because the their visions are really original.)
+
+1. HippocampHairSalon_OSX
+Open up Blood & Glory 2 and head to the store at the right down corner directly.
+Pic4
+See the silver coins and rubies on top of the screen?
+Pic5
+Write down the rubies' number, mine is 69166 ATM. Then run HippocampHairSalon_OSX as root and find the process "Blood And Glory". Enter its process ID, mine is 1283:
+Pic6
+Enter the rubies' number, i.e. 69166, and view the results:
+Pic7
+5 results are found and we've talked about the reason. Which is for rubies? We have 2 simple ways to figure it out:
+i) Change the rubies to a rarer number, and search again. To that end, let's buy some Health Potions and re-search:
+Pic8, 9
+Unfortunately, we've gotten 8 more results for the new value 69136 :( You can repeat this process until you find the only result, or turn to the following trick :P
+ii) Change the rubies and review the address. Again let's buy some Health Potions to make our rubies 69106 (I forgot to screenshot), but review rather than re-search:
+Pic10
+See something interesting? The value at 0x1a8fae0c has changed to 69106, and that matches our rubies! So this is very likely the target value, let's modify it to verify:
+Pic11
+Go back to the game, buy one more Health Potion to refresh the UI. Our rubies grew to 99993 now <3
+Pic12
+Being a rich guy, we can now buy the best weapons and armours to finish our enemies in 1 round. Isn't that cool?!
+Pic13
+Quit and re-enter, you'll find the rubies are still 99993. We've successfully cheated Blood & Glory 2, ha!
+
+2. HippocampHairSalon_iOS
+(Copy the compiled and entitled HippocampHairSalon_iOS to your iOS now)
+Open up 大富翁4FunLite and start a new game
+Pic14
+When it's our turn, write down the money we have, mine is 25000:
+Pic15
+Launch HippocampHairSalon_iOS as root and enter PID of "RichManLite":
+Pic16
+Enter the amount of money, 25000, and we get 14 results. Good:
+Pic17
+Whatever, change the money:
+Pic18
+Review previous search results:
+Pic19
+Modify our target value:
+Pic20
+We're richer now <3
+Pic21
+Quit and enter to verify our hack.
+
+Part VI Conclusion
+We've walked through the writing of a universal memory editor on iOS/OSX, and it works like a charm as game trainer. This post only demonstrates the possibilty of such a tool on Apple systems, things may get way more complicated in practice, especially on applications who possess strong memory protection. In that case, you'll have to combine memory editor with necessary reverse engineering skills to make it. Stick to @iOS应用逆向工程 and iosre.com, more interesting stuff are on the way <3
+
+References:
+1. http://en.wikipedia.org/wiki/Page_(computer_memory)
+2. https://developer.apple.com/library/mac/documentation/performance/conceptual/managingmemory/articles/aboutmemory.html
+3. http://en.wikipedia.org/wiki/Executable
+4. http://stackoverflow.com/questions/12999850/what-are-differentiates-between-a-program-an-executable-and-a-process
+5. http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/osfmk/vm/vm_user.c
+6. http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_read.html
+7. http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_write.html
+8. http://web.mit.edu/darwin/src/modules/xnu/osfmk/man/vm_region.html
