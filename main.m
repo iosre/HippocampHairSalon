@@ -1,10 +1,10 @@
 /*
 mach_vm Functions reference: http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/osfmk/vm/vm_user.c
 
-OSX: clang -framework Foundation -o HippocampHairSalon main.m
+OSX: clang -framework Foundation -o HippocampHairSalon_OSX main.m
 
-iOS: clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS7.0.sdk -arch armv7 -arch armv7s -arch arm64 -framework Foundation -o HippocampHairSalon main.m
-Then: ldid -Sent.xml HippocampHairSalon
+iOS: clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS7.0.sdk -arch armv7 -arch armv7s -arch arm64 -framework Foundation -o HippocampHairSalon_iOS main.m
+Then: ldid -Sent.xml HippocampHairSalon_iOS
 */
 
 #include <stdio.h>
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
 Search:
 	// Prompt
 	printf("Enter the value to search: ");
-	long oldValue = 0; // TODO: change type: int, unsigned long, unsigned int, etc.
+	long oldValue = 0; // change type: int, unsigned long, unsigned int, etc.
 	scanf("%ld", &oldValue);
 
 	// Output all searched results
