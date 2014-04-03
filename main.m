@@ -200,7 +200,7 @@ NextAction:
 				{
 					NSNumber *substringNumber = [substringArray objectAtIndex:i];
 					pointer_t buffer;
-					size = sizeof(int); // because oldValue and newValue is int
+					size = sizeof(int); // because oldValue and newValue are int
 					mach_msg_type_number_t bufferSize = size;
 #if CGFLOAT_IS_DOUBLE
 					long substring = [substringNumber longValue];
