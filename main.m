@@ -1,5 +1,7 @@
 /*
-mach_vm Functions reference: http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/osfmk/vm/vm_user.c
+For an A to Z discussion, please visit http://iosre.com/forum.php?mod=viewthread&tid=105&extra=page%3D1
+
+mach_vm functions reference: http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/osfmk/vm/vm_user.c
 
 OSX: clang -framework Foundation -o HippocampHairSalon_OSX main.m
 
