@@ -16,9 +16,9 @@ Then: ldid -Sent.xml HippocampHairSalon_iOS
 #include <sys/sysctl.h>
 #import <Foundation/Foundation.h>
 
-#if TARGET_OS_OSX
+#if TARGET_OS_MAC
 #include <mach/mach_vm.h>
-#else // import from /usr/lib/system/libsystem_kernel.dylib
+#elif TARGET_OS_IPHONE // import from /usr/lib/system/libsystem_kernel.dylib
 extern kern_return_t
 mach_vm_read(
 	vm_map_t		map,
