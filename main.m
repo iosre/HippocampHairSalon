@@ -1,12 +1,12 @@
 /*
-For an A to Z discussion, please visit http://iosre.com/forum.php?mod=viewthread&tid=105&extra=page%3D1
+   For an A to Z discussion, please visit http://bbs.iosre.com/t/write-a-simple-universal-memory-editor-game-trainer-on-osx-ios-from-scratch/115
 
-mach_vm functions reference: http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/osfmk/vm/vm_user.c
+   mach_vm functions reference: http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/osfmk/vm/vm_user.c
 
-OSX: clang -framework Foundation -o HippocampHairSalon_OSX main.m
+   OSX: clang -framework Foundation -o HippocampHairSalon_OSX main.m
 
-iOS: clang -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS7.0.sdk -arch armv7 -arch armv7s -arch arm64 -framework Foundation -o HippocampHairSalon_iOS main.m
-Then: ldid -Sent.xml HippocampHairSalon_iOS
+   iOS: clang -isysroot `xcrun --sdk iphoneos --show-sdk-path` -arch armv7 -arch arm64 -framework Foundation -o HippocampHairSalon_iOS main.m
+   Then: ldid -Sent.xml HippocampHairSalon_iOS
 */
 
 #include <stdio.h>
@@ -16,36 +16,36 @@ Then: ldid -Sent.xml HippocampHairSalon_iOS
 #include <sys/sysctl.h>
 #import <Foundation/Foundation.h>
 
-#if TARGET_OS_MAC
-#include <mach/mach_vm.h>
-#elif TARGET_OS_IPHONE // import from /usr/lib/system/libsystem_kernel.dylib
+#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR // Imports from /usr/lib/system/libsystem_kernel.dylib
 extern kern_return_t
 mach_vm_read(
-	vm_map_t		map,
-	mach_vm_address_t	addr,
-	mach_vm_size_t		size,
-	pointer_t		*data,
-	mach_msg_type_number_t	*data_size);
+		vm_map_t		map,
+		mach_vm_address_t	addr,
+		mach_vm_size_t		size,
+		pointer_t		*data,
+		mach_msg_type_number_t	*data_size);
 
 extern kern_return_t
 mach_vm_write(
-	vm_map_t			map,
-	mach_vm_address_t		address,
-	pointer_t			data,
-	__unused mach_msg_type_number_t	size);
+		vm_map_t			map,
+		mach_vm_address_t		address,
+		pointer_t			data,
+		__unused mach_msg_type_number_t	size);
 
 extern kern_return_t
 mach_vm_region(
-	vm_map_t		 map,
-	mach_vm_offset_t	*address,
-	mach_vm_size_t		*size,		
-	vm_region_flavor_t	 flavor,
-	vm_region_info_t	 info,		
-	mach_msg_type_number_t	*count,	
-	mach_port_t		*object_name);
+		vm_map_t		 map,
+		mach_vm_offset_t	*address,
+		mach_vm_size_t		*size,		
+		vm_region_flavor_t	 flavor,
+		vm_region_info_t	 info,		
+		mach_msg_type_number_t	*count,	
+		mach_port_t		*object_name);
+#else
+#include <mach/mach_vm.h>
 #endif
 
-static NSArray *AllProcesses(void) // taken from http://forrst.com/posts/UIDevice_Category_For_Processes-h1H
+static NSArray *AllProcesses(void) // Taken from http://forrst.com/posts/UIDevice_Category_For_Processes-h1H
 {
 	int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0};
 	size_t miblen = 4;
